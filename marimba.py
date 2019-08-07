@@ -222,7 +222,8 @@ def get_bar_shape(block,
 
     #the return parameters
     keeps = ddict()
-        
+    keeps.f_target = f_target
+    
     def minimize_f(coeffs_):
         coeffs=coeffs_/coeffs_scaling
 
@@ -251,5 +252,5 @@ def get_bar_shape(block,
         return keeps.err
 
     optimize.fmin(minimize_f, coeffs_, **set_kwargs)
-
+    
     return keeps

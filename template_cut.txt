@@ -1,0 +1,60 @@
+{info}
+%
+(++++++ NB Z Zero on table top)
+
+(==== Initialisation ========)
+
+G0G17G21G40G90
+G54
+
+(============ Main Programme===============)
+
+
+#102={length}	   (length)
+#103={width}	   (width)
+#104={depth}       (thickness)
+#112=4             (delta Y steps)
+(------------ Calc variables ------------)
+
+#129=[FUP[#103/#112]] 		(number of cut cycles)
+#140=0 				(Counter start)
+
+(--- Machine info ---)
+#141=20 	(Safe height)
+
+(--------------)
+Z[#104+#141]
+F1000
+M3
+
+(============ Main Programme===============)
+
+
+M98 P1 L#129 (-------------- call sub)
+
+
+(------------------------------ set up to exit)
+G0G17G21G40G90  (Reset to XY plane G17)
+
+Z[#104+#141]
+G0 Y0
+M30
+(************************* END PROGRAMME ************************)
+
+(======================================================================================)
+
+O1   (---- SUB PROGRAMME)
+
+    G1 Y[#140*#112] (----Z[#104])
+
+    {forwards}
+
+    Y[#140*#112+#112/2]
+
+    {backwards}
+
+    #140=[#140+1]  (Advance cycle)
+
+   
+M99   (=======End Sub Program ========)
+

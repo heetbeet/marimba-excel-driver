@@ -18,6 +18,9 @@ class ddict(dict):
 def getA1(cell):
     return num2col[cell.Column-1]+str(cell.Row)
 
+def getCR(cell):
+    return cell.Column, cell.Row
+
 def get_range_locations(cellrange):
     return [getA1(i) for i in cellrange]
     
@@ -117,7 +120,7 @@ def get_header_structure(ws, firstrow=1):
 
             ppname = nameify(ws.Cells(j.Row+1, j.Column).Value)
 
-            p[pname][ppname] = getA1(j)
+            p[pname][ppname] = getCR(j)
             
     return p
 
