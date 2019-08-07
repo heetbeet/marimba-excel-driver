@@ -117,7 +117,7 @@ def get_xx_yy_toolpath(block,
 def timoshenko_beam_freqs(beam, n_freqs=3):
     #print(beam)
     from scipy import sparse
-    
+    nu = 0.3
     line_yy = (beam.line_yy +
                np.random.normal(scale=1e-16, size=beam.line_yy.shape))
     
@@ -127,7 +127,7 @@ def timoshenko_beam_freqs(beam, n_freqs=3):
     area_yy = beam.width*yy_midpnts
     N_elem  = len(yy_midpnts)
     l       = (beam.length)/N_elem
-    phi_yy  = 24*(6/5)*(1+beam.nu)*I_yy/(area_yy*l**2)
+    phi_yy  = 24*(6/5)*(1+nu)*I_yy/(area_yy*l**2)
     
     ME_yy = [
         (beam.rho*area*l/420)*

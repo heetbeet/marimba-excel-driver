@@ -56,15 +56,17 @@ def get_spreadsheet_with(sheets=[]):
 
         sheetdict = ddict()
         
+        did_find = True
         for sheet in sheets:
             sheetdict[sheet] = [i for i in book.Sheets if i.Name.lower() == sheet]
             
             if len(sheetdict[sheet]) == 0:
-                continue
+                did_find=False
+                break
             
             sheetdict[sheet] = sheetdict[sheet][0]
                 
-            #We found no conflicts
+        if did_find:
             print('We have -->', bookname)
             return book, sheetdict
         
@@ -83,15 +85,15 @@ def get_spreadsheet_by_name(spreadname):
             return book
 
         
-def get_header_structure(ws):
+def get_header_structure(ws, firstrow=1):
     from itertools import chain
     def nameify(s):
-        return str(s).strip().replace(' ','_')
+        return str(s).strip().lower().replace(' ','_').replace('-','_')
 
     N = ws.UsedRange.Rows.Count
     M = ws.UsedRange.Columns.Count
 
-    myRange = ws.Range('A1:%s1'%num2col[M-1])
+    myRange = ws.Range('A%d:%s%d'%(firstrow, num2col[M-1], firstrow))
 
     donezo = set()
     p = ddict()
