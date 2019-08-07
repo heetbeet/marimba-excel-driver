@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[1]:
+# In[10]:
 
 
 ''' >NUL  2>NUL
@@ -26,8 +26,11 @@ import copy
 from pywintypes import com_error
 import time 
 
+import win32com
+excel = win32com.client.Dispatch("Excel.Application")
 
-# In[2]:
+
+# In[11]:
 
 
 jupyter_name = 'marimba_watchdog'
@@ -45,7 +48,7 @@ if is_interactive():
     os.rename(jupyter_name+'.py', jupyter_name+'.bat')
 
 
-# In[25]:
+# In[23]:
 
 
 
@@ -87,17 +90,26 @@ def write_vals(ws, header, vals, rownr=3):
                     continue
                 
             if isinstance(vals[i][ii],(list,np.ndarray)):
-
+                ln = len(vals[i][ii])    
                 crange = ws.Range(
-                    "%s%d:%s%d"%(num2col[header[i][ii][0]-1], rownr,
-                                 num2col[header[i][ii][0]-1], rownr+len(vals[i][ii])-1
+                    "%s%d:%s%d"%(num2col[header[i][ii][0]-1], rownr+0,
+                                 num2col[header[i][ii][0]-1], rownr+ln-1
                                 ))
 
+                crange.Value = [[float(v)] for v in vals[i][ii][0:ln]]
+                    
+                    #row = 1
+                    #ws.Range(ws.Cells(row,1),
+                    #         ws.Cells(row+len(data_array)-1,len(data_array[0]))
+                    #         ).Value = data_array
+                    #print "Processing time: " + str(time.time() - start) + " seconds."
+                    
+                    
                 #crange.Value = tuple(float(v) for v in vals[i][ii])
-                idx = -1
-                for c in crange:
-                    idx+=1
-                    c.Value = vals[i][ii][idx]
+                #idx = -1
+                #for c in crange:
+                #    idx+=1
+                #    c.Value = vals[i][ii][idx]
                     
             else:
                 c = ws.Cells(rownr, header[i][ii][0])
@@ -113,7 +125,7 @@ def clear_rows_from(ws, rownr):
     
 
 
-# In[17]:
+# In[18]:
 
 
 wb, sheets = get_spreadsheet_with(['python_input', 'python_output', 'verbose'])
@@ -150,7 +162,7 @@ for i in vals_in:
         
 
 
-# In[4]:
+# In[24]:
 
 
 n_elements=300
@@ -202,12 +214,14 @@ try:
     verbose_vals.previous_offset.x *= 1000
     verbose_vals.previous_offset.z *= 1000
 
+
     write_vals(sheets.verbose, verbose_header, verbose_vals)
+
 except TypeError:
     pass
 
 
-# In[5]:
+# In[6]:
 
 
 out = ddict(coeffs=coeffs,
@@ -228,9 +242,6 @@ for i in range(30):
     verbose_vals.UID.uid = vals_in[''].uid
     verbose_vals.UID.completed=False
     verbose_vals.UID.date=datetime.date.today().strftime('%d, %b %Y')
-
-    verbose_vals.previous_offset.x = None
-    verbose_vals.previous_offset.z = None
 
     (verbose_vals.current_offset.x,
      verbose_vals.current_offset.z ) = get_xx_yy(out.block, out.coeffs, offset_xy)
