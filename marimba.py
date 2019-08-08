@@ -203,7 +203,7 @@ def get_bar_shape(block,
                   **kwargs):
 
     set_kwargs = dict(xtol=0.001,
-                      ftol=1,
+                      ftol=0.5,
                       maxfun=1000, 
                       disp=False)
     for i in kwargs: set_kwargs[i] = kwargs[i]

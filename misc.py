@@ -6,6 +6,7 @@ import win32api
 import win32com.client
 import pylab as plt
 import numpy as np
+import sys
 
 #DotMap with two monkeypatch extentions
 from dotmap import DotMap as dmap
@@ -222,6 +223,11 @@ def get_row_values(ws, header, rownr):
             vals_in[i][j] = ws.Cells(rownr, col).Value
             
     return vals_in    
+    
+def clear_verbose_sheet(ws):
+    N = max(3, ws.UsedRange.Rows.Count)
+    ws.Range("B3:J15").ClearContents()
+    ws.Range("E3:J%d"%N).ClearContents()
     
     
 def read_marimba_params_in_mm(ws, rownr, header=None):

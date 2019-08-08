@@ -1,7 +1,7 @@
-#!/usr/bin/env python
+
 # coding: utf-8
 
-# In[ ]:
+# In[31]:
 
 
 ''' >NUL  2>NUL
@@ -25,9 +25,10 @@ import copy
 
 from pywintypes import com_error
 import time 
+from pprint import pprint
 
 
-# In[ ]:
+# In[32]:
 
 
 jupyter_name = 'marimba_watchdog'
@@ -45,24 +46,25 @@ if is_interactive():
     os.rename(jupyter_name+'.py', jupyter_name+'.bat')
 
 
-# In[ ]:
+# In[5]:
 
 
 ##############################################################
 # Find spreadsheet and wait until event is triggered
 ##############################################################
-wb, sheets = get_spreadsheet_with(['python_input', 'python_output', 'verbose'])
+wb, sheets = get_spreadsheet_with(['python_output', 'verbose'])
 
 while(True):
     try:
         uid_complete = sheets.python_output.Range('B1').Value
         uid_current  = sheets.python_output.Range('A1').Value
+        uid_allowrun = sheets.python_output.Range('C1').Value
         
     except com_error:
         print('.',end='')
         
     else:
-        if uid_complete != uid_current:
+        if (uid_complete != uid_current) and uid_allowrun:
             sheets.python_output.Range('B1').Value = 0
             break
             
@@ -79,7 +81,7 @@ header = get_header_structure(sheets.python_output, 2)
 p = read_marimba_params_in_mm(sheets.python_output, rownr, header)
 
 
-# In[ ]:
+# In[21]:
 
 
 ##############################################################
@@ -89,27 +91,33 @@ p = read_marimba_params_in_mm(sheets.python_output, rownr, header)
 v_header = get_header_structure(sheets.verbose)
 v_vals   = v_header.copy()
 
-clear_rows_from(sheets.verbose, 3)
+clear_verbose_sheet(sheets.verbose)
 
 try:
     p_prev = read_marimba_params_in_mm(sheets.python_output, rownr-1)
 
     v_vals.previous_offset  .setValues(
-            get_xx_yy(p_prev.block,
-                      p_prev.cur_coeffs,
+            get_xx_yy(p_prev.bar_parameters,
+                      p_prev.cur_coeffs.toList(),
                       p_prev.offset_xy)
     )
     
     v_vals.previous_offset.x*=1000
-    v_vals.previous_offset.y*=1000
-
-except TypeError:
-    print("Ooops, can find previous block's values")
+    v_vals.previous_offset.z*=1000
     
-print(v_header)
+    #Add a zero crossing
+    d = v_vals.previous_offset
+    d.x = np.r_[d.x[0], d.x, d.x[-1]]
+    d.z = np.r_[0     , d.z, 0      ]
+    
+    
+    write_vals(sheets.verbose, v_header, v_vals)
+
+except:
+    print("Ooops, can find previous block's values")
 
 
-# In[ ]:
+# In[22]:
 
 
 #####################################################
@@ -122,7 +130,7 @@ out = dmap(coeffs=p.prev_coeffs.toList(),
            err=np.inf)
 
 for i in range(30):
-    if out.err < 1:
+    if out.err < 0.5:
         break
         
     out = get_bar_shape(p.bar_parameters,
@@ -150,8 +158,9 @@ for i in range(30):
     (block_offset.line_xx,
      block_offset.line_yy ) = get_xx_yy(out.block, out.coeffs, p.offset_xy)
     
-    v_vals.current_offset. setValues([block_offset.line_xx,
-                                      block_offset.line_yy])
+    v_vals.current_offset. setValues(
+                              get_xx_yy(out.block, out.coeffs, p.offset_xy)
+    )
 
     v_vals.current_final .setValues(
                             get_xx_yy(out.block, out.coeffs, (0,0))
@@ -163,6 +172,12 @@ for i in range(30):
     v_vals.current_final.x  *= 1000
     v_vals.current_final.z  *= 1000
 
+    for d in (v_vals.current_offset, 
+              v_vals.current_final):
+        
+        d.x = np.r_[d.x[0], d.x, d.x[-1]]
+        d.z = np.r_[0     , d.z, 0      ]
+
     
     #####################################################
     # What would the freq be if we offset this block?
@@ -172,17 +187,10 @@ for i in range(30):
                                                 p.prev_raw_fem.toArray(),
                                                 p.prev_measured.toArray())
     #This is a absolute mess:
-    v_vals.output.label =["",
-                           "f final target",
-                           "f final current calib.",
-                           "f final current raw",
-                           "",
-                           "cent err",
-                           "",
-                           "f undercut calib.",
-                           "f undercut raw"]
+    v_vals.output.uid = p[''].uid
     
     for ii, line in  enumerate(zip("   ",
+                                   "   ",
                                    out.f_target,
                                    out.freqs_calib,
                                    out.freqs_uncalib,
@@ -269,11 +277,12 @@ CNC_str = open('template_cut.txt', 'r').read().format(
     backwards='\n'.join(str_out[::-1])
 )
 
-
 try:
     with open(filename, 'w') as f:
         f.write(CNC_str)
     print('Written to "%s"'%filename.replace('/','\\'))
+    sheets.verbose.Range("A14").Value = ""
+    
 except:
     print('No output to CNC computer')
     import tempfile
@@ -281,7 +290,9 @@ except:
     with open(fname, 'w') as f:
         f.write(CNC_str)
     print('Saved to temp directory: ', fname)
-        
+    
+    sheets.verbose.Range("A14").Value = "ERROR: not written to CNC"
 
+    
 sheets.python_output.Range('B1').Value = sheets.python_output.Range('A1').Value
 
