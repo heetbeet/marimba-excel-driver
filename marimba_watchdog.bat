@@ -1,7 +1,7 @@
-
+#!/usr/bin/env python
 # coding: utf-8
 
-# In[10]:
+# In[1]:
 
 
 ''' >NUL  2>NUL
@@ -26,11 +26,8 @@ import copy
 from pywintypes import com_error
 import time 
 
-import win32com
-excel = win32com.client.Dispatch("Excel.Application")
 
-
-# In[11]:
+# In[2]:
 
 
 jupyter_name = 'marimba_watchdog'
@@ -48,12 +45,11 @@ if is_interactive():
     os.rename(jupyter_name+'.py', jupyter_name+'.bat')
 
 
-# In[23]:
-
+# In[3]:
 
 
 def get_id_location(ws):
-
+    
     cellid = int(ws.Cells(1,1).Value)
     print(cellid)
 
@@ -69,19 +65,11 @@ def get_id_location(ws):
             if cval==cellid:
                 has_found=True
                 return getCR(c)    
-    
-    
-def headcopy(d):
-    dcopy = ddict()
-    for i,j in d.items():
-        dcopy[i] = ddict(**j)
-        
-    return dcopy
         
 def write_vals(ws, header, vals, rownr=3):
     for i in header:
         for ii, jj in header[i].items():
-            
+            #If "vals" is still rc index and not a value, do not write
             try:
                 len(vals[i][ii])
             except: pass
@@ -89,6 +77,7 @@ def write_vals(ws, header, vals, rownr=3):
                 if len(vals[i][ii]) == 2 and tuple(vals[i][ii]) == tuple(header[i][ii]):
                     continue
                 
+            #special write for lists and arrays
             if isinstance(vals[i][ii],(list,np.ndarray)):
                 ln = len(vals[i][ii])    
                 crange = ws.Range(
@@ -96,25 +85,18 @@ def write_vals(ws, header, vals, rownr=3):
                                  num2col[header[i][ii][0]-1], rownr+ln-1
                                 ))
 
-                crange.Value = [[float(v)] for v in vals[i][ii][0:ln]]
+                def is_num(n):
+                    try:
+                        n+1
+                        return True
+                    except: return False
                     
-                    #row = 1
-                    #ws.Range(ws.Cells(row,1),
-                    #         ws.Cells(row+len(data_array)-1,len(data_array[0]))
-                    #         ).Value = data_array
-                    #print "Processing time: " + str(time.time() - start) + " seconds."
+                crange.Value = [[float(v) if is_num(v) else v] for v in vals[i][ii][0:ln]]
                     
-                    
-                #crange.Value = tuple(float(v) for v in vals[i][ii])
-                #idx = -1
-                #for c in crange:
-                #    idx+=1
-                #    c.Value = vals[i][ii][idx]
-                    
+            #single line write
             else:
                 c = ws.Cells(rownr, header[i][ii][0])
                 c.Value=vals[i][ii]
-            
             
 def clear_rows_from(ws, rownr):
     N = max(rownr, ws.UsedRange.Rows.Count)
@@ -123,9 +105,38 @@ def clear_rows_from(ws, rownr):
     print("A%d:%s%d"%(rownr,M,N))
     ws.Range("A%d:%s%d"%(rownr,M,N)).ClearContents()
     
+def get_row_values(ws, header, rownr):
+    vals_in   = header.copy()
+    
+    for i in vals_in:
+        for j in vals_in[i]:
+            col = vals_in[i][j][0]
+            vals_in[i][j] = ws.Cells(rownr, col).Value
+            
+    return vals_in    
+    
+    
+def read_marimba_params_in_mm(ws, rownr, header=None):
+    if not header:
+        header = get_header_structure(ws, 2)
+    
+    values = get_row_values(ws, header, rownr)
+    
+    values.bar_parameters.depth = values.bar_parameters.pop('thickness')
+    for k in ['length', 'width', 'depth']:
+        values.bar_parameters[k]/=1000
+        
+    values.offset_xy = ( values.initials.undercut_x/1000,
+                         values.initials.undercut_z/1000 )
+    
+    values.bar_parameters.E = values.bar_parameters.pop('youngs')
+    values.bar_parameters.rho = values.bar_parameters.pop('density')
+        
+    return values
+    
 
 
-# In[18]:
+# In[4]:
 
 
 wb, sheets = get_spreadsheet_with(['python_input', 'python_output', 'verbose'])
@@ -147,175 +158,179 @@ while(True):
 
 print('Start all engines')
 
-headers = get_header_structure(sheets.python_output, 2)
-    
-vals_in   = headcopy(headers)       
-vals_prev = headcopy(headers)       
-    
-row = get_id_location(sheets.python_output)[1]
+rownr = get_id_location(sheets.python_output)[1]
+header = get_header_structure(sheets.python_output, 2)
 
-for i in vals_in:
-    for j in vals_in[i]:
-        col = vals_in[i][j][0]
-        vals_in[i][j] = sheets.python_output.Cells(row,col).Value
-        vals_prev[i][j] = sheets.python_output.Cells(row-1,col).Value
-        
+p = read_marimba_params_in_mm(sheets.python_output, rownr, header)
 
 
-# In[24]:
+# In[5]:
 
 
-n_elements=300
-
-coeffs = [j for i,j in vals_in.prev_coeffs.items()]
-
-final_freq = np.array([j for i,j in vals_in.final_frequency.items()])
-
-raw_to_meas = (np.array([j for i,j in vals_in.prev_raw_fem.items()]),
-               np.array([j for i,j in vals_in.prev_measured.items()]))
-
-offset_xy=(vals_in.initials.undercut_x/1000,
-           vals_in.initials.undercut_z/1000)
-
-block = ddict(
-    width = vals_in.bar_parameters.width/1000,
-    depth = vals_in.bar_parameters.thickness/1000, 
-    length = vals_in.bar_parameters.length/1000,
-    E = vals_in.bar_parameters.youngs,
-    rho = vals_in.bar_parameters.density,
-    nu = vals_in.bar_parameters.youngs
-    )
-
+v_header = get_header_structure(sheets.verbose)
+v_vals   = v_header.copy()
 
 clear_rows_from(sheets.verbose, 3)
 
 try:
-    coeffs_prev = [j for i,j in vals_prev.cur_coeffs.items()]
+    p_prev = read_marimba_params_in_mm(sheets.python_output, rownr-1)
 
-    offset_xy_prev = (vals_prev.initials.undercut_x/1000,
-                      vals_prev.initials.undercut_z/1000)
-
-
-    block_prev = ddict(
-        width = vals_prev.bar_parameters.width/1000,
-        depth = vals_prev.bar_parameters.thickness/1000, 
-        length = vals_prev.bar_parameters.length/1000,
-        E = vals_prev.bar_parameters.youngs,
-        rho = vals_prev.bar_parameters.density,
-        nu = vals_prev.bar_parameters.youngs
-        )
-
-    verbose_header = get_header_structure(sheets.verbose)
-    verbose_vals = headcopy(verbose_header)
-
-    (verbose_vals.previous_offset.x,
-     verbose_vals.previous_offset.z ) = get_xx_yy(block_prev, coeffs_prev, offset_xy_prev)
+    v_vals.previous_offset  .setValues(
+            get_xx_yy(p_prev.block,
+                      p_prev.cur_coeffs,
+                      p_prev.offset_xy)
+    )
     
-    verbose_vals.previous_offset.x *= 1000
-    verbose_vals.previous_offset.z *= 1000
-
-
-    write_vals(sheets.verbose, verbose_header, verbose_vals)
+    v_vals.previous_offset.x*=1000
+    v_vals.previous_offset.y*=1000
 
 except TypeError:
-    pass
+    print("Ooops, can find previous block's values")
+    
+print(v_header)
 
 
 # In[6]:
 
 
-out = ddict(coeffs=coeffs,
-            err=np.inf)
+#####################################################
+# Sculpture a block wiht the correct frequencies
+#####################################################
+from pprint import pprint
+
+
+out = dmap(coeffs=p.prev_coeffs.toList(),
+           err=np.inf)
 
 for i in range(30):
     if out.err < 1:
         break
         
-    out = get_bar_shape(block,
-                        final_freq,
-                        *raw_to_meas,
+    out = get_bar_shape(p.bar_parameters,
+                        p.final_frequency.toArray(),
+                        p.prev_raw_fem.toArray(),
+                        p.prev_measured.toArray(),
                         coeffs_initial=out.coeffs)
+
+    prntout = out.copy()
+    del prntout.block.line_xx
+    del prntout.block.line_yy
     
-    verbose_vals = headcopy(verbose_header)
+    print('\n*** Round: ',i)
+    pprint(prntout)
 
-    import datetime
-    verbose_vals.UID.uid = vals_in[''].uid
-    verbose_vals.UID.completed=False
-    verbose_vals.UID.date=datetime.date.today().strftime('%d, %b %Y')
-
-    (verbose_vals.current_offset.x,
-     verbose_vals.current_offset.z ) = get_xx_yy(out.block, out.coeffs, offset_xy)
-
-    (verbose_vals.current_final.x,
-     verbose_vals.current_final.z ) = get_xx_yy(out.block, out.coeffs, (0,0))
-
-    verbose_vals.current_offset.x *= 1000
-    verbose_vals.current_offset.z *= 1000
-    verbose_vals.current_final.x *= 1000
-    verbose_vals.current_final.z *= 1000
+    v_vals = v_header.copy()
+    v_vals.UID.uid = p[''].uid
     
 
-    write_vals(sheets.verbose, verbose_header, verbose_vals)
+    v_vals.current_offset. setValues(
+                            get_xx_yy(out.block,
+                                      out.coeffs, 
+                                      p.offset_xy))
+        
+
+    v_vals.current_final .setValues(
+                            get_xx_yy(out.block, out.coeffs, (0,0))
+    )
+
+    
+    v_vals.current_offset.x *= 1000
+    v_vals.current_offset.z *= 1000
+    v_vals.current_final.x  *= 1000
+    v_vals.current_final.z  *= 1000
+
+    
+    #####################################################
+    # What would the freq be if we offset this block?
+    #####################################################
+    block_offset = out.block.copy()
+
+    (block_offset.line_xx,
+     block_offset.line_yy ) = get_xx_yy(out.block, out.coeffs, p.offset_xy)
+
+    offset_freqs_uncalib = timoshenko_beam_freqs(block_offset)
+    offset_freqs_calibrated = calibrate_raw_FEM(offset_freqs_uncalib,
+                                                p.prev_raw_fem.toArray(),
+                                                p.prev_measured.toArray())
+    
+    v_vals.output.label =["",
+                           "f final target",
+                           "f final current calib.",
+                           "f final current raw",
+                           "",
+                           "cent err",
+                           "",
+                           "f undercut calib.",
+                           "f undercut raw"]
+    
+    for ii, line in  enumerate(zip("   ",
+                                   out.f_target,
+                                   out.freqs_calib,
+                                   out.freqs_uncalib,
+                                   "   ",
+                                   out.cents,
+                                   "   ",
+                                   offset_freqs_calibrated,
+                                   offset_freqs_uncalib)):
+    
+        v_vals.output[('p0','p1','p2')[ii]] = list(line)
+    
+    
+    
+    write_vals(sheets.verbose, v_header, v_vals)
 
 
-# In[6]:
+# In[ ]:
 
 
-verbose_vals = headcopy(verbose_header)
-verbose_vals.completed=True
-write_vals(sheets.verbose, verbose_header, verbose_vals)
 
-
-vals_out = headcopy(headers)
-
-
-block_offset = ddict(**out.block)
-
-(block_offset.line_xx,
- block_offset.line_yy ) = get_xx_yy(block_offset, out.coeffs, offset_xy)
-
-offset_freqs_uncalib = timoshenko_beam_freqs(block_offset)
-offset_freqs_calibrated = calibrate_raw_FEM(offset_freqs_uncalib,
-                                            *raw_to_meas)
-
-(vals_out.cur_target_calibrated_fem.f0, 
- vals_out.cur_target_calibrated_fem.f1,
- vals_out.cur_target_calibrated_fem.f2) = offset_freqs_calibrated
-
-(vals_out.cur_raw_fem.f0,
- vals_out.cur_raw_fem.f1,
- vals_out.cur_raw_fem.f2 ) = offset_freqs_uncalib
-
-(vals_out.cur_coeffs.c0,
- vals_out.cur_coeffs.c1,
- vals_out.cur_coeffs.c2 ) = out.coeffs
-
-vals_out.output.cut_point = None
-vals_out.output.z_centre  = None
-vals_out.output.z_min     = None
-
-row = get_id_location(sheets.python_output)[1]
-write_vals(sheets.python_output, headers, vals_out, rownr=row)
 
 
 # In[7]:
 
 
+####################################
+# Write this to the spreadsheet
+####################################
+vals_out = header.copy()
+
+vals_out.cur_target_calibrated_fem .setValues(offset_freqs_calibrated)
+vals_out.cur_raw_fem               .setValues(offset_freqs_uncalib)
+vals_out.cur_coeffs                .setValues(out.coeffs)
+ 
+xxr, yyr = get_xx_yy(out.block,
+                     out.coeffs,
+                     p.offset_xy,
+                     10000)
+
+vals_out.output.cut_point = (xxr[np.argmax(yyr!=yyr[0])]-xxr[0])*1000
+vals_out.output.z_centre  = yyr[int(len(yyr)/2)]*1000
+vals_out.output.z_min     = np.min(yyr)*1000
+
+write_vals(sheets.python_output, header, vals_out, rownr=rownr)
+
+
+# In[13]:
+
+
+##############################
+# Write this to the CNC machine
+###############################
+
 str_out = []
 
-xxr, yyr = get_xx_yy(out.block, out.coeffs, offset_xy, 10000)
-
-xx, yy = get_xx_yy_toolpath(block,
-                   coeffs,
-                   offset_xy=offset_xy,
-                   drill_diam=vals_in.cnc.drill_diam/1000,
+xx, yy = get_xx_yy_toolpath(
+                   out.block,
+                   out.coeffs,
+                   offset_xy=p.offset_xy,
+                   drill_diam=p.cnc.drill_diam/1000,
                    step_mm=0.4)
 
-to_zero = block.length/2
+to_zero = out.block.length/2
 for x, y in zip(xx, yy):
     str_out.append('X %.2f Z %.2f'%((x+to_zero)*1000, y*1000))
 
-filename = '//Cnc/CNC/marimba FEM/%s_%.3f.txt'%(vals_in.initials.note, vals_in.initials.undercut_z)
+filename = '//Cnc/CNC/marimba FEM/%s_%.3f.txt'%(p.initials.note, p.offset_xy[1])
     
 infstr="""
 ( filename = %s )
@@ -328,16 +343,16 @@ infstr="""
 os.path.split(filename)[-1],
 out.block.width*1000,
 out.block.length*1000,
-(xxr[np.argmax(yyr!=yyr[0])]-xxr[0])*1000,
-np.min(yyr)*1000,
-yyr[int(len(yyr)/2)]*1000
+vals_out.output.cut_point,
+vals_out.output.z_centre,
+vals_out.output.z_min,
 )
 
 CNC_str = open('template_cut.txt', 'r').read().format(
     info=infstr,
-    length=block.length*1000,
-    width=block.width*1000,
-    depth=block.depth*1000,
+    length=out.block.length*1000,
+    width=out.block.width*1000,
+    depth=out.block.depth*1000,
     forwards='\n'.join(str_out),
     backwards='\n'.join(str_out[::-1])
 )
@@ -349,6 +364,12 @@ try:
     print('Written to "%s"'%filename.replace('/','\\'))
 except:
     print('No output to CNC computer')
+    import tempfile
+    fname = os.path.abspath(tempfile.gettempdir()+'/'+os.path.split(filename)[-1])
+    with open(fname, 'w') as f:
+        f.write(CNC_str)
+    print('Saved to temp directory: ', fname)
+        
 
 sheets.python_output.Range('B1').Value = sheets.python_output.Range('A1').Value
 

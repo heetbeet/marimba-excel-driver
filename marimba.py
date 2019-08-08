@@ -1,4 +1,4 @@
-from misc import ddict
+from misc import dmap
 import six
 
 import warnings
@@ -65,7 +65,7 @@ def get_xx_yy(block,
     line_xx = np.linspace(-block.length/2, block.length/2,  n_points)
     line_yy = f(line_xx)
 
-    if offset_xy[0] or offset_xy[1]:
+    if offset_xy[0]!=0 or offset_xy[1]!=0:
         ox, oy = offset_xy
         
         line_yy = line_yy+oy
@@ -177,7 +177,6 @@ def calibrate_raw_FEM(raw_freqs,
     samples_measured = samples_measured[:N]
     
     ratios = np.array(samples_measured)/np.array(samples_raw_freqs)
-
     return raw_freqs*ratios
 
     
@@ -209,7 +208,7 @@ def get_bar_shape(block,
                       disp=False)
     for i in kwargs: set_kwargs[i] = kwargs[i]
 
-    block_copy = ddict(**block)
+    block_copy = block.copy()
 
     #hack to keep the coefficient in a decent metric
     #currently (c0>>c1>>c2) and it causes issues
@@ -221,7 +220,7 @@ def get_bar_shape(block,
     err_ratio = np.array(err_ratio)/np.sum(err_ratio)
 
     #the return parameters
-    keeps = ddict()
+    keeps = dmap()
     keeps.f_target = f_target
     
     def minimize_f(coeffs_):

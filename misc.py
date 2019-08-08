@@ -5,10 +5,19 @@ import pythoncom
 import win32api
 import win32com.client
 import pylab as plt
+import numpy as np
+
+#DotMap with two monkeypatch extentions
+from dotmap import DotMap as dmap
+def __setValues(self, lst): 
+    for i, k in enumerate(self):
+        self[k] = lst[i]
+dmap.setValues = __setValues 
+dmap.toList    = lambda self: list(self.values())
+dmap.toArray   = lambda self: np.array(list(self.values()))
 
 alph = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 num2col = [i for i in alph] + [i+j for i in alph for j in alph]
-
 
 class ddict(dict):
     def __init__(self, **kwds):
@@ -99,7 +108,7 @@ def get_header_structure(ws, firstrow=1):
     myRange = ws.Range('A%d:%s%d'%(firstrow, num2col[M-1], firstrow))
 
     donezo = set()
-    p = ddict()
+    p = dmap()
     for i in myRange:
         if getA1(i) in donezo:
             continue
@@ -110,10 +119,8 @@ def get_header_structure(ws, firstrow=1):
         else:
             pname = nameify(merge_area[0][0])
 
-        if getA1(i) == 'A1': #hack
-            pname = 'UID'
-
-        p[pname] = ddict()
+        #if getA1(i) == 'A1': #hack
+        #    pname = 'UID'
 
         for j in chain(i, merge_area):
             donezo.add(getA1(j))
