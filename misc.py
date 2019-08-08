@@ -156,22 +156,89 @@ def insert_image(wb, impath, location=(1,1)):
                          Height=img.shape[0])
 
 
+def get_id_location(ws):
+    
+    cellid = int(ws.Cells(1,1).Value)
+    print(cellid)
 
-"""
-for n, shape in enumerate(ws.Shapes):
-    if shape.Name.startswith('TextBox'):
-        shape.delete()
+    for i in range(sys.maxsize):
+        has_found=False
+        for c in ws.Range('A%d:A%d'%(i*100+2, (i+1)*100+2)):
 
-M = ws.UsedRange.Columns.Count
+            try:
+                cval = int(c.Value)
+            except:
+                continue
 
-left=ws.Cells(1,M+1).Left
-top=ws.Cells(1,1).Top
-right=ws.Cells(1,M+7).Left
-bottom=ws.Cells(10,1).Top
+            if cval==cellid:
+                has_found=True
+                return getCR(c)    
+        
+def write_vals(ws, header, vals, rownr=3):
+    for i in header:
+        for ii, jj in header[i].items():
+            #If "vals" is still rc index and not a value, do not write
+            try:
+                len(vals[i][ii])
+            except: pass
+            else:
+                if len(vals[i][ii]) == 2 and tuple(vals[i][ii]) == tuple(header[i][ii]):
+                    continue
+                
+            #special write for lists and arrays
+            if isinstance(vals[i][ii],(list,np.ndarray)):
+                ln = len(vals[i][ii])    
+                crange = ws.Range(
+                    "%s%d:%s%d"%(num2col[header[i][ii][0]-1], rownr+0,
+                                 num2col[header[i][ii][0]-1], rownr+ln-1
+                                ))
 
-tb = ws.Shapes.AddTextbox(1,  left      , top,
-                              right-left, bottom-top)
-tb.TextFrame2.TextRange.Characters.Text = 'This is a great big test.'
-tb.TextFrame2.TextRange.Characters.Font.Name = "Consolas"
-tb.TextFrame2.TextRange.Characters.Font.Size = 10
-"""
+                def is_num(n):
+                    try:
+                        n+1
+                        return True
+                    except: return False
+                    
+                crange.Value = [[float(v) if is_num(v) else v] for v in vals[i][ii][0:ln]]
+                    
+            #single line write
+            else:
+                c = ws.Cells(rownr, header[i][ii][0])
+                c.Value=vals[i][ii]
+            
+def clear_rows_from(ws, rownr):
+    N = max(rownr, ws.UsedRange.Rows.Count)
+    M = num2col[ws.UsedRange.Columns.Count-1]
+    
+    print("A%d:%s%d"%(rownr,M,N))
+    ws.Range("A%d:%s%d"%(rownr,M,N)).ClearContents()
+    
+def get_row_values(ws, header, rownr):
+    vals_in   = header.copy()
+    
+    for i in vals_in:
+        for j in vals_in[i]:
+            col = vals_in[i][j][0]
+            vals_in[i][j] = ws.Cells(rownr, col).Value
+            
+    return vals_in    
+    
+    
+def read_marimba_params_in_mm(ws, rownr, header=None):
+    if not header:
+        header = get_header_structure(ws, 2)
+    
+    values = get_row_values(ws, header, rownr)
+    
+    values.bar_parameters.depth = values.bar_parameters.pop('thickness')
+    for k in ['length', 'width', 'depth']:
+        values.bar_parameters[k]/=1000
+        
+    values.offset_xy = ( values.initials.undercut_x/1000,
+                         values.initials.undercut_z/1000 )
+    
+    values.bar_parameters.E = values.bar_parameters.pop('youngs')
+    values.bar_parameters.rho = values.bar_parameters.pop('density')
+        
+    return values
+    

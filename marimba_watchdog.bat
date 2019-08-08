@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[ ]:
 
 
 ''' >NUL  2>NUL
@@ -27,7 +27,7 @@ from pywintypes import com_error
 import time 
 
 
-# In[2]:
+# In[ ]:
 
 
 jupyter_name = 'marimba_watchdog'
@@ -45,100 +45,12 @@ if is_interactive():
     os.rename(jupyter_name+'.py', jupyter_name+'.bat')
 
 
-# In[3]:
+# In[ ]:
 
 
-def get_id_location(ws):
-    
-    cellid = int(ws.Cells(1,1).Value)
-    print(cellid)
-
-    for i in range(sys.maxsize):
-        has_found=False
-        for c in ws.Range('A%d:A%d'%(i*100+2, (i+1)*100+2)):
-
-            try:
-                cval = int(c.Value)
-            except:
-                continue
-
-            if cval==cellid:
-                has_found=True
-                return getCR(c)    
-        
-def write_vals(ws, header, vals, rownr=3):
-    for i in header:
-        for ii, jj in header[i].items():
-            #If "vals" is still rc index and not a value, do not write
-            try:
-                len(vals[i][ii])
-            except: pass
-            else:
-                if len(vals[i][ii]) == 2 and tuple(vals[i][ii]) == tuple(header[i][ii]):
-                    continue
-                
-            #special write for lists and arrays
-            if isinstance(vals[i][ii],(list,np.ndarray)):
-                ln = len(vals[i][ii])    
-                crange = ws.Range(
-                    "%s%d:%s%d"%(num2col[header[i][ii][0]-1], rownr+0,
-                                 num2col[header[i][ii][0]-1], rownr+ln-1
-                                ))
-
-                def is_num(n):
-                    try:
-                        n+1
-                        return True
-                    except: return False
-                    
-                crange.Value = [[float(v) if is_num(v) else v] for v in vals[i][ii][0:ln]]
-                    
-            #single line write
-            else:
-                c = ws.Cells(rownr, header[i][ii][0])
-                c.Value=vals[i][ii]
-            
-def clear_rows_from(ws, rownr):
-    N = max(rownr, ws.UsedRange.Rows.Count)
-    M = num2col[ws.UsedRange.Columns.Count-1]
-    
-    print("A%d:%s%d"%(rownr,M,N))
-    ws.Range("A%d:%s%d"%(rownr,M,N)).ClearContents()
-    
-def get_row_values(ws, header, rownr):
-    vals_in   = header.copy()
-    
-    for i in vals_in:
-        for j in vals_in[i]:
-            col = vals_in[i][j][0]
-            vals_in[i][j] = ws.Cells(rownr, col).Value
-            
-    return vals_in    
-    
-    
-def read_marimba_params_in_mm(ws, rownr, header=None):
-    if not header:
-        header = get_header_structure(ws, 2)
-    
-    values = get_row_values(ws, header, rownr)
-    
-    values.bar_parameters.depth = values.bar_parameters.pop('thickness')
-    for k in ['length', 'width', 'depth']:
-        values.bar_parameters[k]/=1000
-        
-    values.offset_xy = ( values.initials.undercut_x/1000,
-                         values.initials.undercut_z/1000 )
-    
-    values.bar_parameters.E = values.bar_parameters.pop('youngs')
-    values.bar_parameters.rho = values.bar_parameters.pop('density')
-        
-    return values
-    
-
-
-# In[4]:
-
-
+##############################################################
+# Find spreadsheet and wait until event is triggered
+##############################################################
 wb, sheets = get_spreadsheet_with(['python_input', 'python_output', 'verbose'])
 
 while(True):
@@ -155,8 +67,11 @@ while(True):
             break
             
     time.sleep(2)
-
 print('Start all engines')
+
+##############################################################
+# Get the main sheet's headers
+##############################################################
 
 rownr = get_id_location(sheets.python_output)[1]
 header = get_header_structure(sheets.python_output, 2)
@@ -164,8 +79,12 @@ header = get_header_structure(sheets.python_output, 2)
 p = read_marimba_params_in_mm(sheets.python_output, rownr, header)
 
 
-# In[5]:
+# In[ ]:
 
+
+##############################################################
+# Get the verbose sheet's headers and try to write previous line_xx, line_yy
+##############################################################
 
 v_header = get_header_structure(sheets.verbose)
 v_vals   = v_header.copy()
@@ -190,11 +109,11 @@ except TypeError:
 print(v_header)
 
 
-# In[6]:
+# In[ ]:
 
 
 #####################################################
-# Sculpture a block wiht the correct frequencies
+# Sculpture a block with the correct frequencies
 #####################################################
 from pprint import pprint
 
@@ -219,21 +138,26 @@ for i in range(30):
     print('\n*** Round: ',i)
     pprint(prntout)
 
+    #####################################################
+    # Write verbose output
+    #####################################################
     v_vals = v_header.copy()
     v_vals.UID.uid = p[''].uid
     
-
-    v_vals.current_offset. setValues(
-                            get_xx_yy(out.block,
-                                      out.coeffs, 
-                                      p.offset_xy))
-        
+    
+    block_offset = out.block.copy()
+    
+    (block_offset.line_xx,
+     block_offset.line_yy ) = get_xx_yy(out.block, out.coeffs, p.offset_xy)
+    
+    v_vals.current_offset. setValues([block_offset.line_xx,
+                                      block_offset.line_yy])
 
     v_vals.current_final .setValues(
                             get_xx_yy(out.block, out.coeffs, (0,0))
     )
-
     
+    #Times 1000 to mm
     v_vals.current_offset.x *= 1000
     v_vals.current_offset.z *= 1000
     v_vals.current_final.x  *= 1000
@@ -243,16 +167,11 @@ for i in range(30):
     #####################################################
     # What would the freq be if we offset this block?
     #####################################################
-    block_offset = out.block.copy()
-
-    (block_offset.line_xx,
-     block_offset.line_yy ) = get_xx_yy(out.block, out.coeffs, p.offset_xy)
-
     offset_freqs_uncalib = timoshenko_beam_freqs(block_offset)
     offset_freqs_calibrated = calibrate_raw_FEM(offset_freqs_uncalib,
                                                 p.prev_raw_fem.toArray(),
                                                 p.prev_measured.toArray())
-    
+    #This is a absolute mess:
     v_vals.output.label =["",
                            "f final target",
                            "f final current calib.",
@@ -276,17 +195,10 @@ for i in range(30):
         v_vals.output[('p0','p1','p2')[ii]] = list(line)
     
     
-    
     write_vals(sheets.verbose, v_header, v_vals)
 
 
 # In[ ]:
-
-
-
-
-
-# In[7]:
 
 
 ####################################
@@ -310,7 +222,7 @@ vals_out.output.z_min     = np.min(yyr)*1000
 write_vals(sheets.python_output, header, vals_out, rownr=rownr)
 
 
-# In[13]:
+# In[ ]:
 
 
 ##############################
