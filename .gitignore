@@ -43,5 +43,6 @@ package-lock.json
 geckodriver.log
 *.iml
 
+~$*
 /dumps
 /marimbas-c59ec80921d4.json
