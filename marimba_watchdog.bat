@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[31]:
+# In[1]:
 
 
 ''' >NUL  2>NUL
@@ -28,7 +28,7 @@ import time
 from pprint import pprint
 
 
-# In[32]:
+# In[2]:
 
 
 jupyter_name = 'marimba_watchdog'
@@ -46,7 +46,7 @@ if is_interactive():
     os.rename(jupyter_name+'.py', jupyter_name+'.bat')
 
 
-# In[5]:
+# In[ ]:
 
 
 ##############################################################
@@ -81,7 +81,7 @@ header = get_header_structure(sheets.python_output, 2)
 p = read_marimba_params_in_mm(sheets.python_output, rownr, header)
 
 
-# In[21]:
+# In[ ]:
 
 
 ##############################################################
@@ -117,7 +117,7 @@ except:
     print("Ooops, can find previous block's values")
 
 
-# In[22]:
+# In[ ]:
 
 
 #####################################################
@@ -129,7 +129,7 @@ from pprint import pprint
 out = dmap(coeffs=p.prev_coeffs.toList(),
            err=np.inf)
 
-for i in range(30):
+for ii in range(30):
     if out.err < 0.5:
         break
         
@@ -143,7 +143,7 @@ for i in range(30):
     del prntout.block.line_xx
     del prntout.block.line_yy
     
-    print('\n*** Round: ',i)
+    print('\n*** Round: ', ii)
     pprint(prntout)
 
     #####################################################
@@ -189,14 +189,14 @@ for i in range(30):
     #This is a absolute mess:
     v_vals.output.uid = p[''].uid
     
-    for ii, line in  enumerate(zip("   ",
-                                   "   ",
+    for ii, line in  enumerate(zip([ii+1, '', ''],
+                                   ['','',''],
                                    out.f_target,
                                    out.freqs_calib,
                                    out.freqs_uncalib,
-                                   "   ",
+                                   ['','',''],
                                    out.cents,
-                                   "   ",
+                                   ['','',''],
                                    offset_freqs_calibrated,
                                    offset_freqs_uncalib)):
     
@@ -250,7 +250,7 @@ to_zero = out.block.length/2
 for x, y in zip(xx, yy):
     str_out.append('X %.2f Z %.2f'%((x+to_zero)*1000, y*1000))
 
-filename = '//Cnc/CNC/marimba FEM/%s_%.3f.txt'%(p.initials.note, p.offset_xy[1])
+filename = '//Cnc/CNC/marimba FEM/%s_%.3f.txt'%(p.initials.note, p.offset_xy[1]*1000)
     
 infstr="""
 ( filename = %s )
