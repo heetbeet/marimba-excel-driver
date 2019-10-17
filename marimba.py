@@ -1,4 +1,4 @@
-from misc import dmap
+from misc import dmap, ddict
 import six
 
 import warnings
@@ -113,7 +113,31 @@ def get_xx_yy_toolpath(block,
 
         return xx_out, yy_out
     
+#%%
+def get_shaving_positions(beam, nfreqs=3):
+    try:
+        beam_copy = ddict(**beam.toDict())
+    except:
+        beam_copy = ddict(**beam)
+        
+    cut_depth = np.array([beam.width*0.01, beam.width*0.02, beam.width*0.03, beam.width*0.02, beam.width*0.01])*0.1
+    n = 2
     
+    freqs_real = timoshenko_beam_freqs(beam)
+    
+    freqs = []
+    for i in range(n,len(beam.line_yy)-n):
+        beam_copy.line_yy = np.array(beam.line_yy)
+        beam_copy.line_yy[i-n:i+n+1] -=cut_depth
+        freqs.append(timoshenko_beam_freqs(beam_copy))
+        
+
+    freqs = np.array(([freqs[0]]*(n+1))+freqs+([freqs[-1]]*(n+1)))
+
+    return hertz_to_cents(freqs_real) - hertz_to_cents(freqs)
+
+
+#%%
 def timoshenko_beam_freqs(beam, n_freqs=3):
     #print(beam)
     from scipy import sparse
@@ -169,6 +193,7 @@ def timoshenko_beam_freqs(beam, n_freqs=3):
     return f
 
 
+#%%
 def calibrate_raw_FEM(raw_freqs,
                       samples_raw_freqs,
                       samples_measured):

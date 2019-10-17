@@ -28,24 +28,6 @@ import time
 from pprint import pprint
 
 
-# In[2]:
-
-
-jupyter_name = 'marimba_watchdog'
-if is_interactive():
-    import os
-    import subprocess
-    subprocess.call(['jupyter',
-                     'nbconvert',
-                     '--to',
-                     'script',
-                     jupyter_name+'.ipynb'])
-    try:
-        os.remove(jupyter_name+'.bat')
-    except: pass
-    os.rename(jupyter_name+'.py', jupyter_name+'.bat')
-
-
 # In[ ]:
 
 
@@ -74,6 +56,7 @@ print('Start all engines')
 ##############################################################
 # Get the main sheet's headers
 ##############################################################
+#%%
 
 rownr = get_id_location(sheets.python_output)[1]
 header = get_header_structure(sheets.python_output, 2)
@@ -202,7 +185,10 @@ for ii in range(30):
     
         v_vals.output[('p0','p1','p2')[ii]] = list(line)
     
-    
+    if out.err < 0.5:
+        v_vals.sensitivity_cents .setValues(
+            get_shaving_positions(out.block).T
+        )
     write_vals(sheets.verbose, v_header, v_vals)
 
 
