@@ -134,7 +134,7 @@ def get_shaving_positions(beam, nfreqs=3):
 
     freqs = np.array(([freqs[0]]*(n+1))+freqs+([freqs[-1]]*(n+1)))
 
-    return hertz_to_cents(freqs_real) - hertz_to_cents(freqs)
+    return hertz_to_cents(freqs) - hertz_to_cents(freqs_real)
 
 
 #%%
