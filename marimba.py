@@ -219,12 +219,12 @@ def uncalibrate_FEM(freqs,
 
 def get_bar_shape(block,
                   f_target,
-                  
                   samples_raw,
                   samples_measured,
-
+                  
                   coeffs_initial=[6, 0.3000, 0.0030],
                   n_elements=None,
+                  n_freqs=3,
                   **kwargs):
 
     set_kwargs = dict(xtol=0.001,
@@ -241,8 +241,16 @@ def get_bar_shape(block,
     coeffs_ = np.array(coeffs_initial)*coeffs_scaling
     
     #hack to make f0 more sensitive than f1 and f2
-    err_ratio=[1, 0.5, 0.5]
+    err_ratio=np.array([1, 0.5, 0.5])
+    err_ratio[n_freqs:] = 0
     err_ratio = np.array(err_ratio)/np.sum(err_ratio)
+    
+    samples_raw = np.array(samples_raw)
+    samples_measured = np.array(samples_measured)
+    for i in range(n_freqs,3):
+        samples_raw[i] = samples_raw[n_freqs-1]
+        samples_measured[i] = samples_measured[n_freqs-1]
+    
 
     #the return parameters
     keeps = dmap()
